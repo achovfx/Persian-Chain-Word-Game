@@ -22,6 +22,7 @@ export interface OnlineRoom {
   status: 'LOBBY' | 'ROULETTE' | 'PLAYING' | 'VICTORY';
   winner: Player | null;
   lastActivity: number;
+  liveDraft: { playerId: string; playerName: string; word: string; updatedAt: number } | null;
   lastActionFeedback: {
     type: 'success' | 'error' | 'info';
     message: string;
@@ -75,6 +76,7 @@ export function createRoom(
     status: 'LOBBY',
     winner: null,
     lastActivity: Date.now(),
+    liveDraft: null,
     lastActionFeedback: {
       type: 'info',
       message: 'اتاق ساخته شد. دوستان خود را با لینک دعوت کنید!',
@@ -160,6 +162,7 @@ export function startRoomMatch(
   const startingLetter = persianDictionary.getRandomAvailableLetter(new Set());
   room.currentLetter = startingLetter;
   room.status = 'PLAYING';
+  room.liveDraft = null;
   room.roundNumber = 1;
   room.activePlayerIndex = 0;
   room.usedNormalizedWords = [];
@@ -172,6 +175,25 @@ export function startRoomMatch(
     timestamp: Date.now()
   };
 
+  return { success: true, room };
+}
+
+
+/** Broadcast the active player's unfinished input to everyone in the room. */
+export function updateRoomDraft(
+  roomId: string,
+  playerId: string,
+  word: string
+): { success: boolean; room?: OnlineRoom; error?: string } {
+  const room = getRoom(roomId);
+  if (!room) return { success: false, error: 'اتاق یافت نشد.' };
+  if (room.status !== 'PLAYING') return { success: false, error: 'بازی در جریان نیست.' };
+  const activePlayer = room.players[room.activePlayerIndex];
+  if (!activePlayer || activePlayer.id !== playerId) {
+    return { success: false, error: 'در حال حاضر نوبت شما نیست!' };
+  }
+  room.liveDraft = { playerId, playerName: activePlayer.name, word: word.slice(0, 80), updatedAt: Date.now() };
+  room.lastActivity = Date.now();
   return { success: true, room };
 }
 
@@ -195,6 +217,7 @@ export function submitWordInRoom(
   room.lastActivity = Date.now();
 
   if (result.isValid && result.entry) {
+    room.liveDraft = null;
     const nextStartLetter = getLastLetter(word);
     const historyItem: WordHistoryItem = {
       id: `${Date.now()}_${Math.random()}`,
@@ -227,6 +250,7 @@ export function submitWordInRoom(
 
     return { success: true, room };
   } else {
+    room.liveDraft = null;
     // Lose a life
     activePlayer.lives -= 1;
     if (activePlayer.lives <= 0) {

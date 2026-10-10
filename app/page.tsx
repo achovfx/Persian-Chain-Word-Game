@@ -512,6 +512,24 @@ export default function Home() {
             roomId={activeOnlineRoomId || undefined}
             onlineRoom={onlineRoomSnapshot || undefined}
             myOnlinePlayerId={myOnlinePlayerId || undefined}
+            onOnlineWordSubmit={(word) => {
+              if (!activeOnlineRoomId || !myOnlinePlayerId) return;
+              void fetch(`/api/rooms/${activeOnlineRoomId}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'submitWord', playerId: myOnlinePlayerId, word })
+              }).then((res) => res.json()).then((data) => {
+                if (data.room) {
+                  setOnlineRoomSnapshot(data.room);
+                  setPlayers(data.room.players);
+                  setCurrentLetter(data.room.currentLetter);
+                  setRoundNumber(data.room.roundNumber);
+                  setWordHistory(data.room.wordHistory);
+                  setUsedNormalizedWords(new Set(data.room.usedNormalizedWords));
+                }
+                if (!data.success && data.error) console.info(data.error);
+                if (data.room?.status === 'VICTORY' && data.room.winner) handleGameOver(data.room.winner);
+              }).catch(() => {});
+            }}
             onOnlineDraftChange={(word) => {
               if (!activeOnlineRoomId || !myOnlinePlayerId) return;
               void fetch(`/api/rooms/${activeOnlineRoomId}`, {

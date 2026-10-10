@@ -22,6 +22,7 @@ import {
 } from './vocabularyList';
 import { MASSIVE_PERSIAN_ENTRIES } from './massiveLexicon';
 import { UPLOADED_VOCABULARY_RAW } from './uploadedLexicon';
+import { COMMUNITY_PERSIAN_WORDS } from './communityLexicon';
 import {
   PERSIAN_NAMES_ENTRIES,
   PERSIAN_GEOGRAPHY_ENTRIES,
@@ -244,6 +245,26 @@ class PersianDictionaryService {
           this.entriesByFirstLetter.set(firstL, [entry]);
         }
       }
+    }
+
+    // 8. Process the curated community Persian word list (MIT-licensed source).
+    // Existing words win; only genuinely new normalized forms are added.
+    for (const rawWord of COMMUNITY_PERSIAN_WORDS) {
+      const norm = normalizePersian(rawWord);
+      if (!norm || norm.length < 2 || this.normalizedWordSet.has(norm)) continue;
+      const firstL = getFirstLetter(norm);
+      const entry: PersianWordEntry = {
+        word: rawWord,
+        normalized: norm,
+        meaning: 'واژه از فهرست واژگان رایج فارسی',
+        category: 'واژگان عمومی',
+        difficulty: norm.length <= 4 ? 'easy' : norm.length <= 6 ? 'medium' : 'hard'
+      };
+      this.normalizedWordSet.add(norm);
+      this.entriesByNormalized.set(norm, entry);
+      const bucket = this.entriesByFirstLetter.get(firstL);
+      if (bucket) bucket.push(entry);
+      else this.entriesByFirstLetter.set(firstL, [entry]);
     }
 
     this.isInitialized = true;

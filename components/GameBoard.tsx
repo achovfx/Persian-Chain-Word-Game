@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { RotateCcw, LogOut, Sparkles, BookOpen, Clock, Heart, Bot, Flag, Share2, Award } from 'lucide-react';
 import { Player, WordHistoryItem, MatchSettings, checkWinner, getNextActivePlayerIndex } from '@/lib/game/gameEngine';
+import type { OnlineRoom } from '@/lib/rooms/roomStore';
 import { PlayerCard } from './PlayerCard';
 import { WordInput } from './WordInput';
 import { WordHistory } from './WordHistory';
@@ -31,6 +32,10 @@ interface GameBoardProps {
   onManualEndGame: () => void;
   onOpenDictionaryForWord: (word: string) => void;
   roomId?: string;
+  onlineRoom?: OnlineRoom;
+  myOnlinePlayerId?: string;
+  onOnlineDraftChange?: (word: string) => void;
+  onOnlineWordSubmit?: (word: string) => void;
   onShareRoom?: () => void;
 }
 
@@ -53,6 +58,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onManualEndGame,
   onOpenDictionaryForWord,
   roomId,
+  onlineRoom,
+  myOnlinePlayerId,
+  onOnlineDraftChange,
+  onOnlineWordSubmit,
   onShareRoom
 }) => {
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
@@ -68,8 +77,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const aiTimerRef = useRef<NodeJS.Timeout | null>(null);
   const turnTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const activePlayer = players[activePlayerIndex];
+  const effectiveActivePlayerIndex = roomId && onlineRoom ? onlineRoom.activePlayerIndex : activePlayerIndex;
+  const activePlayer = roomId && onlineRoom ? onlineRoom.players[effectiveActivePlayerIndex] : players[effectiveActivePlayerIndex];
+  const isMyOnlineTurn = !roomId || !onlineRoom || Boolean(myOnlinePlayerId && activePlayer?.id === myOnlinePlayerId);
   const isAITurn = activePlayer ? activePlayer.isAI : false;
+  const liveDraft = roomId && onlineRoom?.liveDraft && onlineRoom.liveDraft.playerId !== myOnlinePlayerId ? onlineRoom.liveDraft : null;
 
   // Clear timers on unmount
   useEffect(() => {
@@ -189,6 +201,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     onWordAccepted(word, historyItem, nextStartLetter);
 
     // Switch turn
+    if (roomId) return; // Online turns are authoritative on the server.
     const nextIdx = getNextActivePlayerIndex(players, activePlayerIndex);
     setActivePlayerIndex(nextIdx);
     setRemainingSeconds(settings.turnTimeLimit);
@@ -198,6 +211,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [
     activePlayer,
+    roomId,
     currentLetter,
     players,
     activePlayerIndex,
@@ -209,7 +223,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // AI Turn Orchestration
   useEffect(() => {
-    if (!isAITurn || !activePlayer || activePlayer.isEliminated) return;
+    if (roomId || !isAITurn || !activePlayer || activePlayer.isEliminated) return;
 
     const plan = planAIMove(
       currentLetter,
@@ -257,6 +271,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     };
   }, [
     activePlayerIndex,
+    roomId,
     currentLetter,
     isAITurn,
     activePlayer,
@@ -269,6 +284,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // Submit Word by Human Player
   const handleHumanWordSubmit = (rawWord: string) => {
+    if (!isMyOnlineTurn || isAITurn) return;
+    if (roomId) {
+      onOnlineWordSubmit?.(rawWord);
+      return;
+    }
     const result = persianDictionary.validateSubmission(
       rawWord,
       currentLetter,
@@ -276,6 +296,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     );
 
     if (result.isValid && result.entry) {
+      if (roomId) {
+        // Server validates the word and advances the authoritative turn.
+        onWordAccepted(rawWord, {
+          id: `${Date.now()}_${Math.random()}`, word: rawWord, normalized: normalizePersian(rawWord),
+          playerId: activePlayer.id, playerName: activePlayer.name, startLetter: currentLetter,
+          endLetter: getLastLetter(rawWord), timestamp: Date.now(), entry: result.entry
+        }, getLastLetter(rawWord));
+        return;
+      }
       handleValidWordSubmission(rawWord, result.entry);
     } else {
       // Invalid word submission -> Lose a life
@@ -427,7 +456,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <PlayerCard
             key={p.id}
             player={p}
-            isActive={idx === activePlayerIndex}
+            isActive={idx === effectiveActivePlayerIndex}
             isCompact={players.length > 2}
           />
         ))}
@@ -437,6 +466,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       <WordInput
         requiredLetter={currentLetter}
         isAITurn={isAITurn}
+        isInputDisabled={Boolean(roomId && !isMyOnlineTurn)}
+        liveDraft={liveDraft ? { playerName: liveDraft.playerName, word: liveDraft.word } : null}
+        onDraftChange={roomId && isMyOnlineTurn ? onOnlineDraftChange : undefined}
         aiThinkingMessage={aiThinkingMessage}
         aiTypingWord={aiTypingWord}
         remainingSeconds={remainingSeconds}

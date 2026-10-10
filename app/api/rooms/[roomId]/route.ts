@@ -4,7 +4,8 @@ import {
   joinRoom,
   startRoomMatch,
   submitWordInRoom,
-  endRoomMatchManually
+  endRoomMatchManually,
+  updateRoomDraft
 } from '@/lib/rooms/roomStore';
 
 export async function GET(
@@ -45,6 +46,11 @@ export async function POST(
 
     if (action === 'start') {
       const res = startRoomMatch(roomId, body.playerId || '');
+      return NextResponse.json(res);
+    }
+
+    if (action === 'draft') {
+      const res = updateRoomDraft(roomId, body.playerId || '', body.word || '');
       return NextResponse.json(res);
     }
 

@@ -35,6 +35,7 @@ interface GameBoardProps {
   onlineRoom?: OnlineRoom;
   myOnlinePlayerId?: string;
   onOnlineDraftChange?: (word: string) => void;
+  onOnlineWordSubmit?: (word: string) => void;
   onShareRoom?: () => void;
 }
 
@@ -60,6 +61,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onlineRoom,
   myOnlinePlayerId,
   onOnlineDraftChange,
+  onOnlineWordSubmit,
   onShareRoom
 }) => {
   const [activePlayerIndex, setActivePlayerIndex] = useState(0);
@@ -283,6 +285,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // Submit Word by Human Player
   const handleHumanWordSubmit = (rawWord: string) => {
     if (!isMyOnlineTurn || isAITurn) return;
+    if (roomId) {
+      onOnlineWordSubmit?.(rawWord);
+      return;
+    }
     const result = persianDictionary.validateSubmission(
       rawWord,
       currentLetter,
@@ -459,7 +465,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* Central Input and Action Zone */}
       <WordInput
         requiredLetter={currentLetter}
-        isAITurn={isAITurn || !isMyOnlineTurn}
+        isAITurn={isAITurn}
         isInputDisabled={Boolean(roomId && !isMyOnlineTurn)}
         liveDraft={liveDraft ? { playerName: liveDraft.playerName, word: liveDraft.word } : null}
         onDraftChange={roomId && isMyOnlineTurn ? onOnlineDraftChange : undefined}

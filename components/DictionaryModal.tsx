@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { X, Search, BookOpen, Sparkles, Filter } from 'lucide-react';
+import { X, Search, BookOpen, Sparkles, Filter, Plus } from 'lucide-react';
 import { persianDictionary } from '@/lib/persian/dictionary';
 import { PERSIAN_ALPHABET, PERSIAN_LETTER_NAMES, normalizePersian } from '@/lib/persian/normalizer';
 import { soundEffects } from '@/lib/audio/soundEffects';
@@ -21,6 +21,9 @@ export const DictionaryModal: React.FC<DictionaryModalProps> = ({
   const [searchQuery, setSearchQuery] = useState(initialSearchWord);
   const [expandedWord, setExpandedWord] = useState<string | null>(null);
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [newWord, setNewWord] = useState('');
+  const [addFeedback, setAddFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [customWordsVersion, setCustomWordsVersion] = useState(0);
   const [isExplaining, setIsExplaining] = useState(false);
   const totalCount = persianDictionary.getWordCount();
 
@@ -55,6 +58,27 @@ export const DictionaryModal: React.FC<DictionaryModalProps> = ({
   };
 
   const [selectedCategory, setSelectedCategory] = useState<string>('همه');
+
+  const handleAddCustomWord = () => {
+    const word = newWord.trim();
+    if (!word) { setAddFeedback({ type: 'error', message: 'اول یک واژه وارد کن.' }); return; }
+    if (persianDictionary.getWordEntry(word)) { setAddFeedback({ type: 'error', message: 'این واژه از قبل در واژه‌نامه وجود دارد.' }); return; }
+    const entry = persianDictionary.addCustomWord(word);
+    if (!entry) { setAddFeedback({ type: 'error', message: 'واژه باید حداقل دو حرف فارسی داشته باشد و عدد یا نشانه نداشته باشد.' }); return; }
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('zanjireh_custom_persian_words') || '[]');
+      const words: string[] = Array.isArray(saved) ? saved.filter((item): item is string => typeof item === 'string') : [];
+      words.push(entry.word);
+      window.localStorage.setItem('zanjireh_custom_persian_words', JSON.stringify(words));
+    } catch {
+      setAddFeedback({ type: 'error', message: 'ذخیره‌سازی در این مرورگر در دسترس نیست؛ واژه فقط تا بارگذاری مجدد فعال می‌ماند.' });
+      setCustomWordsVersion((v) => v + 1); setNewWord(''); return;
+    }
+    setAddFeedback({ type: 'success', message: '«' + entry.word + '» به واژه‌نامه اضافه شد.' });
+    setNewWord(''); setSearchQuery(entry.word); setSelectedLetter(null); setSelectedCategory('همه');
+    setCustomWordsVersion((v) => v + 1); soundEffects.playClick();
+  };
+
 
   const categories = [
     'همه',
@@ -101,7 +125,7 @@ export const DictionaryModal: React.FC<DictionaryModalProps> = ({
     }
 
     return list.slice(0, 200);
-  }, [searchQuery, selectedLetter, selectedCategory]);
+  }, [searchQuery, selectedLetter, selectedCategory, customWordsVersion]);
 
 
   return (
@@ -165,6 +189,17 @@ export const DictionaryModal: React.FC<DictionaryModalProps> = ({
             )}
           </div>
         </div>
+
+        {/* Add a custom word to this browser's personal dictionary */}
+        <form onSubmit={(e) => { e.preventDefault(); handleAddCustomWord(); }} className="mt-3 shrink-0 rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-3">
+          <label className="mb-2 block text-xs font-bold text-emerald-300">افزودن دستی واژه</label>
+          <div className="flex gap-2">
+            <input value={newWord} onChange={(e) => { setNewWord(e.target.value); setAddFeedback(null); }} placeholder="واژه فارسی جدید را بنویس..." className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm font-semibold text-white focus:border-emerald-400 focus:outline-none" dir="rtl" maxLength={40} />
+            <button type="submit" className="flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-500"><Plus className="h-4 w-4" /> افزودن</button>
+          </div>
+          {addFeedback && <p role="status" className={'mt-2 text-xs ' + (addFeedback.type === 'success' ? 'text-emerald-300' : 'text-rose-300')}>{addFeedback.message}</p>}
+          <p className="mt-1 text-[10px] text-slate-400">واژه‌های اضافه‌شده در همین مرورگر ذخیره می‌شوند.</p>
+        </form>
 
         {/* Alphabet Letter Strip */}
         <div className="mt-3 shrink-0">

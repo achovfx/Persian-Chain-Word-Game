@@ -271,6 +271,28 @@ class PersianDictionaryService {
   }
 
 
+  /** Adds a user-provided Persian word to the in-memory dictionary. */
+  public addCustomWord(rawWord: string): PersianWordEntry | null {
+    const word = (rawWord || '').trim();
+    const norm = normalizePersian(word);
+    if (!isValidPersianCharacters(word) || norm.length < 2 || this.normalizedWordSet.has(norm)) return null;
+
+    const firstL = getFirstLetter(norm);
+    const entry: PersianWordEntry = {
+      word,
+      normalized: norm,
+      meaning: 'واژه‌ای که کاربر به فهرست شخصی اضافه کرده است',
+      category: 'واژگان شخصی',
+      difficulty: norm.length <= 4 ? 'easy' : norm.length <= 6 ? 'medium' : 'hard'
+    };
+    this.normalizedWordSet.add(norm);
+    this.entriesByNormalized.set(norm, entry);
+    const bucket = this.entriesByFirstLetter.get(firstL);
+    if (bucket) bucket.push(entry);
+    else this.entriesByFirstLetter.set(firstL, [entry]);
+    return entry;
+  }
+
   /**
    * Returns total count of verified Persian words in database.
    */

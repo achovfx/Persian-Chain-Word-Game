@@ -59,6 +59,7 @@ export default function Home() {
   const [onlineRoomPresetCount, setOnlineRoomPresetCount] = useState<number | undefined>(undefined);
   const [activeOnlineRoomId, setActiveOnlineRoomId] = useState<string | null>(null);
   const [myOnlinePlayerId, setMyOnlinePlayerId] = useState<string | null>(null);
+  const [onlineRoomSnapshot, setOnlineRoomSnapshot] = useState<OnlineRoom | null>(null);
 
   // User Profile state
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -156,6 +157,7 @@ export default function Home() {
         const data = await res.json();
         if (data.success && data.room) {
           const r: OnlineRoom = data.room;
+          setOnlineRoomSnapshot(r);
           setPlayers(r.players);
           setCurrentLetter(r.currentLetter);
           setRoundNumber(r.roundNumber);
@@ -219,6 +221,7 @@ export default function Home() {
 
   const handleRoomGameStarted = (room: OnlineRoom, currentPlayerId: string) => {
     setActiveOnlineRoomId(room.id);
+    setOnlineRoomSnapshot(room);
     setMyOnlinePlayerId(currentPlayerId);
     setPlayers(room.players);
     setCurrentLetter(room.currentLetter);
@@ -243,6 +246,7 @@ export default function Home() {
   const handleStartGame = (mode: GameMode, playerNames: string[], aiDifficulty: AIDifficulty) => {
     setCurrentMode(mode);
     setActiveOnlineRoomId(null);
+    setOnlineRoomSnapshot(null);
     const effectiveNames = [
       userProfile.name?.trim() || playerNames[0] || 'شما',
       ...playerNames.slice(1)
@@ -506,6 +510,17 @@ export default function Home() {
             onManualEndGame={handleManualEndGame}
             onOpenDictionaryForWord={handleOpenDictionaryForWord}
             roomId={activeOnlineRoomId || undefined}
+            onlineRoom={onlineRoomSnapshot || undefined}
+            myOnlinePlayerId={myOnlinePlayerId || undefined}
+            onOnlineDraftChange={(word) => {
+              if (!activeOnlineRoomId || !myOnlinePlayerId) return;
+              void fetch(`/api/rooms/${activeOnlineRoomId}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'draft', playerId: myOnlinePlayerId, word })
+              }).then((res) => res.json()).then((data) => {
+                if (data.success && data.room) setOnlineRoomSnapshot(data.room);
+              }).catch(() => {});
+            }}
             onShareRoom={handleShareOnlineRoom}
           />
         )}

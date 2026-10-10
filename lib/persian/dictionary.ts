@@ -496,3 +496,17 @@ class PersianDictionaryService {
 
 // Export singleton instance
 export const persianDictionary = new PersianDictionaryService();
+
+// Restore user-added words in the browser so they are available during gameplay too.
+if (typeof window !== 'undefined') {
+  try {
+    const savedWords = JSON.parse(window.localStorage.getItem('zanjireh_custom_persian_words') || '[]');
+    if (Array.isArray(savedWords)) {
+      for (const word of savedWords) {
+        if (typeof word === 'string') persianDictionary.addCustomWord(word);
+      }
+    }
+  } catch {
+    // Ignore invalid local storage data.
+  }
+}

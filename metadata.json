@@ -1,0 +1,6 @@
+{
+  "name": "زنجیره کلمات - بازی کلمات فارسی",
+  "description": "بازی جذاب و مهیج زنجیره کلمات فارسی تک‌نفره و چندنفره با واژه‌نامه معتبر، هوش مصنوعی و انیمیشن‌های سینمایی",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

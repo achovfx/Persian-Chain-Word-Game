@@ -8,6 +8,9 @@ import { soundEffects } from '@/lib/audio/soundEffects';
 interface WordInputProps {
   requiredLetter: string;
   isAITurn: boolean;
+  isInputDisabled?: boolean;
+  liveDraft?: { playerName: string; word: string } | null;
+  onDraftChange?: (word: string) => void;
   aiThinkingMessage?: string;
   aiTypingWord?: string;
   remainingSeconds: number;
@@ -24,6 +27,9 @@ interface WordInputProps {
 export const WordInput: React.FC<WordInputProps> = ({
   requiredLetter,
   isAITurn,
+  isInputDisabled = false,
+  liveDraft,
+  onDraftChange,
   aiThinkingMessage,
   aiTypingWord,
   remainingSeconds,
@@ -35,6 +41,12 @@ export const WordInput: React.FC<WordInputProps> = ({
 }) => {
   const [inputWord, setInputWord] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!onDraftChange) return;
+    const timer = setTimeout(() => onDraftChange(inputWord), 120);
+    return () => clearTimeout(timer);
+  }, [inputWord, onDraftChange]);
 
   // Focus input automatically on human turn
   useEffect(() => {
@@ -48,7 +60,7 @@ export const WordInput: React.FC<WordInputProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (isAITurn) return;
+    if (isAITurn || isInputDisabled) return;
 
     const trimmed = inputWord.trim();
     if (!trimmed) return;
@@ -166,6 +178,7 @@ export const WordInput: React.FC<WordInputProps> = ({
               type="text"
               value={inputWord}
               onChange={(e) => setInputWord(e.target.value)}
+              disabled={isInputDisabled}
               placeholder={`کلمه‌ای با حرف «${requiredLetter}» بنویسید و دکمه را لمس کنید...`}
               className={`w-full bg-slate-950/80 text-white text-base sm:text-lg font-bold rounded-xl py-3.5 pr-4 pl-32 border transition-all focus:outline-none focus:ring-2 ${
                 !isStartingLetterMatching && inputWord.length > 0
@@ -180,7 +193,7 @@ export const WordInput: React.FC<WordInputProps> = ({
 
             <button
               type="submit"
-              disabled={!inputWord.trim()}
+              disabled={isInputDisabled || !inputWord.trim()}
               className="absolute left-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-lg text-xs sm:text-sm shadow-md shadow-cyan-500/20 transition-all flex items-center gap-1.5"
             >
               <Send className="w-4 h-4 rotate-180" />
@@ -198,6 +211,13 @@ export const WordInput: React.FC<WordInputProps> = ({
             </div>
           )}
         </form>
+      )}
+
+      {liveDraft && (
+        <div className="mt-3 rounded-xl border border-cyan-500/30 bg-cyan-950/30 px-4 py-3" aria-live="polite">
+          <div className="text-xs font-semibold text-cyan-300">{liveDraft.playerName} در حال نوشتن است…</div>
+          <div className="mt-1 min-h-7 text-lg font-bold text-white" dir="rtl">{liveDraft.word || '…'}<span className="ml-1 inline-block h-4 w-1 animate-pulse bg-cyan-400 align-middle" /></div>
+        </div>
       )}
 
       {/* Turn Feedback Toasts */}
